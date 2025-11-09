@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Anime Dashboard</title>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+   
+    <style>
+        body { font-family: sans-serif; background: #f4f4f4; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; }
+        h1, h2 { color: #333; }
+        .feature { background: #fff; padding: 20px; margin-bottom: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .chart { min-height: 400px; width: 100%; }
+        .filters { margin-bottom: 20px; }
+        .filters select, .filters button, .filters input { padding: 10px; font-size: 14px; }
+        .content-layout { display: flex; gap: 20px; }
+        .chart-container { flex: 1; }
+        .grid-container { flex: 1; }
+        .anime-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-bottom: 250px;
+        }
+        .anime-card { position: relative; cursor: pointer; }
+        .anime-card img {
+            width: 100%;
+            height: 190px;
+            object-fit: cover;
+            border-radius: 5px;
+            background: #eee;
+        }
+        .anime-title {
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-top: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .info-tooltip {
+            display: none;
+            position: absolute;
+            top: 10px;
+            left: 0;
+            width: 250px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10;
+            font-size: 0.9em;
+            pointer-events: none;
+        }
+        .anime-card:hover .info-tooltip { display: block; }
+        #loading { display: none; font-size: 1.5em; text-align: center; padding: 20px; }
+        /* (THÊM MỚI) CSS cho Bộ lọc F2 */
+        .f2-filters {
+             display: grid;
+             /* 3fr cho genres, 1fr cho các cột còn lại */
+             grid-template-columns: 3fr 1fr 1fr 1fr 1fr;
+             gap: 15px;
+             align-items: start;
+        }
+        .genre-checkboxes {
+            max-height: 100px; /* Giới hạn chiều cao */
+            overflow-y: auto; /* Thêm thanh cuộn */
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+        .genre-checkboxes label {
+            display: block; /* Mỗi checkbox 1 hàng */
+            margin-right: 15px;
+        }
+        /* (THÊM MỚI) CSS cho Bộ lọc F3 */
+        .f3-filters {
+            display: flex;
+            gap: 10px; /* Khoảng cách giữa các dropdown */
+        }
+        .f3-filters select {
+            flex: 1; /* Cho 3 dropdown rộng bằng nhau */
+            padding: 10px;
+            font-size: 14px;
+        }
+        .f3-genre-checkboxes label {
+            display: block;
+            margin-right: 15px;
+        }
+        .loading { display: none; }
+    </style>
+</head>
+<body>
+
+
+    <div class="container">
+        <h1>Anime Suisen</h1>
+        <div id="loading">Đang tải...</div>
+
+
+        <div class="feature" id="feature-1">
+            <h2>Top 5 Studio theo Thể loại</h2>
+            <div class="filters">
+                <select id="genre-filter" style="width: 300px;">
+                    <option value="">-- Lọc theo Thể loại --</option>
+                </select>
+                <button id="filter-button">Lọc</button>
+            </div>
+           
+            <div class="content-layout">
+                <div class="chart-container">
+                    <div id="chart-studios" class="chart"></div>
+                </div>
+                <div class="grid-container">
+                    <h3>Anime nổi bật từ các Studio này</h3>
+                    <div id="grid-anime" class="anime-grid"></div>
+                </div>
+            </div>
+        </div>
+        </div> <div class="feature" id="feature-2">
+            <h2>Tìm Anime theo Sở thích</h2>
+            <div class="filters f2-filters">
+                <div class="genre-checkboxes" id="f2-genre-checkboxes">
+                    </div>
+                <select id="f2-year-filter"><option value="">-- Năm --</option></select>
+                <select id="f2-studio-filter"><option value="">-- Studio --</option></select>
+                <select id="f2-episodes-filter">
+                    <option value="">-- Số tập --</option>
+                    <option value="1">Movie (1 tập)</option>
+                    <option value="12">Series ngắn (<= 12)</option>
+                    <option value="26">Series vừa (<= 26)</option>
+                </select>
+                <select id="f2-rating-filter">
+                    <option value="">-- Rating --</option>
+                    <option value="9">Trên 9.0</option>
+                    <option value="8">Trên 8.0</option>
+                    <option value="7">Trên 7.0</option>
+                </select>
+            </div>
+            <button id="f2-filter-button" style="padding: 10px 20px;">Tìm</button>
+            
+            <div class="loading" id="loading-f2" style="margin-top: 20px;">Đang tìm...</div>
+            <div id="f2-grid-anime" class="anime-grid" style="margin-top: 20px;">
+                </div>
+        </div>
+        <div class="feature" id="feature-3">
+            <h2>So sánh Xu hướng Thể loại (2010-2022)</h2>
+            <p>Chọn 1, 2, hoặc 3 thể loại để so sánh điểm trung bình qua các năm.</p>
+            
+            <div class="filters f3-filters">
+                <select id="f3-genre-1">
+                    <option value="">-- Chọn thể loại 1 --</option>
+                </select>
+                <select id="f3-genre-2">
+                    <option value="">-- Chọn thể loại 2 --</option>
+                </select>
+                <select id="f3-genre-3">
+                    <option value="">-- Chọn thể loại 3 --</option>
+                </select>
+            </div>
+            <button id="f3-compare-button" style="padding: 10px 20px;">So sánh</button>
+            
+            <div class="loading" id="loading-f3" style="margin-top: 20px;">Đang tải biểu đồ...</div>
+            <div id="chart-trends" class="chart" style="margin-top: 20px;">
+                </div>
+        </div>
+        <div class="feature" id="feature-4">
+            <h2>Đề xuất Anime Tương tự</h2>
+            <p>Nhập tên anime bạn thích để tìm các phim có nội dung, thể loại, studio... tương đồng.</p>
+            
+            <div class="filters">
+                <input list="anime-titles" id="f4-anime-input" placeholder="Nhập tên anime..." style="width: 400px;">
+                <datalist id="anime-titles">
+                    </datalist>
+                <button id="f4-recommend-button">Tìm gợi ý</button>
+            </div>
+            <div id="f4-source-container" style="display: none; margin-top: 20px;">
+                </div>
+            <div class="loading" id="loading-f4" style="margin-top: 20px; text-align: center;">
+                Đang tính toán điểm tương đồng... (Việc này có thể mất vài giây)
+            </div>
+            
+            <div id="f4-content" style="display: none; margin-top: 20px;">
+                <div class="chart-container">
+                    <div id="chart-recommend" class="chart"></div>
+                </div>
+                <div class="grid-container" style="margin-top: 30px;">
+                    <h3>Danh sách gợi ý (sắp xếp theo độ tương đồng)</h3>
+                    <div id="grid-recommend" class="anime-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const API_URL = "";
+        // (SỬA) Đổi lại 2 biến khóa
+        let isKitsuLoading = false; // Khóa chung cho F1 và F4 (dùng Kitsu)
+        let isJikanLoading = false; // Khóa riêng cho F2 (dùng Jikan)
+        // (SỬA) Đổi tên các element F1 để chúng không bị trùng
+        const btnFilterF1 = document.getElementById('filter-button');
+        const selectGenreF1 = document.getElementById('genre-filter');
+        const loadingDivF1 = document.getElementById('loading');
+        const featureDivF1 = document.getElementById('feature-1');
+
+        // Hàm sleep (chờ)
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Khởi tạo Tính năng 1
+            loadF1Genres(); // Đổi tên hàm
+            btnFilterF1.addEventListener('click', loadFeature1); // Sửa tên biến
+            loadFeature1();
+            
+            // (THÊM MỚI) Khởi tạo Tính năng 2
+            loadF2Filters();
+            document.getElementById('f2-filter-button').addEventListener('click', loadFeature2);
+            // (THÊM MỚI) Khởi tạo Tính năng 3
+            loadF3Filters();
+            document.getElementById('f3-compare-button').addEventListener('click', loadFeature3);
+            // (THÊM MỚI) Khởi tạo Tính năng 4
+            loadF4Titles(); // Tải danh sách tên anime cho ô input
+            document.getElementById('f4-recommend-button').addEventListener('click', loadFeature4);
+        });
+        
+        // === CÁC HÀM CHO TÍNH NĂNG 1 ===
+        // (SỬA) Đổi tên hàm
+        async function loadF1Genres() { 
+            try {
+                const res = await fetch(`${API_URL}/api/genres`);
+                const genres = await res.json();
+                genres.forEach(g => {
+                    // (SỬA) Sửa tên biến
+                    selectGenreF1.innerHTML += `<option value="${g}">${g}</option>`;
+                });
+            } catch (e) { console.error("Lỗi tải F1 genres", e); }
+        }
+
+        async function loadFeature1() {
+            // (SỬA) Sửa tên biến
+            loadingDivF1.style.display = 'block';
+            featureDivF1.style.display = 'none';
+            const genre = selectGenreF1.value;
+
+            try {
+                const res = await fetch(`${API_URL}/api/top_studios?genre=${genre}`);
+                const data = await res.json();
+                
+                drawStudioChart(data.chart_data);
+                // (SỬA) Gọi hàm dùng chung, trỏ vào grid F1
+                drawAnimeGrid_F1_Kitsu(data.grid_data, 'grid-anime');
+            } catch(e) {
+                loadingDivF1.innerText = 'Lỗi tải dữ liệu. Hãy thử lại.';
+                console.error(e);
+            } finally {
+                loadingDivF1.style.display = 'none';
+                featureDivF1.style.display = 'block';
+            }
+        }
+
+        function drawStudioChart(studioData) {
+            // (Code hàm này giữ nguyên)
+            Highcharts.chart('chart-studios', {
+                chart: { type: 'bar' },
+                title: { text: 'Top 5 Studio theo Điểm TB' },
+                xAxis: { categories: studioData.map(s => s.studios) },
+                yAxis: { min: 7, title: { text: 'Điểm TB' } },
+                series: [{
+                    name: 'Điểm TB',
+                    data: studioData.map(s => ({ y: s.avg_score, anime_count: s.anime_count }))
+                }],
+                tooltip: { pointFormat: 'Điểm TB: <b>{point.y}</b> / {point.anime_count} anime' }
+            });
+        }
+        
+        // === (THÊM MỚI) CÁC HÀM CHO TÍNH NĂNG 2 ===
+        async function loadF2Filters() {
+            try {
+                const res = await fetch(`${API_URL}/api/all_filters`);
+                const data = await res.json();
+                
+                // 1. Populate Genres (Checkbox)
+                const genreBox = document.getElementById('f2-genre-checkboxes');
+                data.genres.forEach(g => {
+                    genreBox.innerHTML += `
+                        <label>
+                            <input type="checkbox" name="f2-genre" value="${g}"> ${g}
+                        </label>`;
+                });
+                
+                // 2. Populate Years
+                const yearSelect = document.getElementById('f2-year-filter');
+                data.years.forEach(y => {
+                    yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+                });
+                
+                // 3. Populate Studios
+                const studioSelect = document.getElementById('f2-studio-filter');
+                data.studios.forEach(s => {
+                    studioSelect.innerHTML += `<option value="${s}">${s}</option>`;
+                });
+                
+            } catch (e) { console.error("Lỗi tải F2 filters", e); }
+        }
+        
+        async function loadFeature2() {
+            const loadingDiv = document.getElementById('loading-f2');
+            loadingDiv.style.display = 'block';
+            
+            // 1. Lấy giá trị (Checkbox cho "chọn nhiều")
+            const checkedGenres = document.querySelectorAll('#f2-genre-checkboxes input:checked');
+            const genreList = Array.from(checkedGenres).map(cb => cb.value);
+            
+            // 2. Xây dựng URL (Lesson 7)
+            const params = new URLSearchParams();
+            if (genreList.length > 0) {
+                params.append('genres', genreList.join(',')); // "Action,Comedy"
+            }
+            if (document.getElementById('f2-year-filter').value) {
+                params.append('year', document.getElementById('f2-year-filter').value);
+            }
+            if (document.getElementById('f2-studio-filter').value) {
+                params.append('studio', document.getElementById('f2-studio-filter').value);
+            }
+            if (document.getElementById('f2-episodes-filter').value) {
+                params.append('max_episodes', document.getElementById('f2-episodes-filter').value);
+            }
+            if (document.getElementById('f2-rating-filter').value) {
+                params.append('min_score', document.getElementById('f2-rating-filter').value);
+            }
+
+            // 3. Gọi API
+            try {
+                const res = await fetch(`${API_URL}/api/filter?${params.toString()}`);
+                const data = await res.json();
+                // Tái sử dụng hàm vẽ Grid, nhưng trỏ vào div F2
+                drawAnimeGrid_F2_Jikan(data, 'f2-grid-anime');
+            } catch(e) {
+                document.getElementById('f2-grid-anime').innerHTML = 'Lỗi tải dữ liệu.';
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+        
+        // === (THÊM MỚI) CÁC HÀM CHO TÍNH NĂNG 3 ===
+        // (THAY THẾ) HÀM NÀY
+// (THAY THẾ) HÀM NÀY
+        async function loadF3Filters() {
+            try {
+                const res = await fetch(`${API_URL}/api/genres`);
+                const genres = await res.json();
+                
+                // Lấy 3 select box
+                const select1 = document.getElementById('f3-genre-1');
+                const select2 = document.getElementById('f3-genre-2');
+                const select3 = document.getElementById('f3-genre-3');
+                
+                // Nạp dữ liệu cho cả 3
+                genres.forEach(g => {
+                    select1.innerHTML += `<option value="${g}">${g}</option>`;
+                    select2.innerHTML += `<option value="${g}">${g}</option>`;
+                    select3.innerHTML += `<option value="${g}">${g}</option>`;
+                });
+                
+            } catch (e) { console.error("Lỗi tải F3 filters", e); }
+        }
+
+// (THAY THẾ) HÀM NÀY
+        async function loadFeature3() {
+            const loadingDiv = document.getElementById('loading-f3');
+            loadingDiv.style.display = 'block';
+            
+            // 1. Lấy giá trị từ 3 dropdown
+            const g1 = document.getElementById('f3-genre-1').value;
+            const g2 = document.getElementById('f3-genre-2').value;
+            const g3 = document.getElementById('f3-genre-3').value;
+
+            // 2. Lọc ra các giá trị không rỗng và không trùng lặp
+            // (Đúng theo logic của bạn: "khác nhau" và "vẫn chạy nếu chỉ có 1")
+            const genresToCompare = [g1, g2, g3].filter(g => g !== ""); // Lọc rỗng
+            const uniqueGenres = [...new Set(genresToCompare)]; // Lọc trùng
+            
+            if (uniqueGenres.length === 0) {
+                 alert('Bạn phải chọn ít nhất 1 thể loại.');
+                 loadingDiv.style.display = 'none';
+                 return;
+            }
+
+            // 3. Xây dựng URL
+            const params = new URLSearchParams();
+            params.append('genres', uniqueGenres.join(',')); // "Action,Comedy"
+
+            // 4. Gọi API
+            try {
+                const res = await fetch(`${API_URL}/api/genre_trends?${params.toString()}`);
+                const data = await res.json();
+                drawTrendChart(data); 
+            } catch(e) {
+                document.getElementById('chart-trends').innerHTML = 'Lỗi tải dữ liệu.';
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        // (THÊM MỚI) Hàm vẽ Biểu đồ Đường
+        function drawTrendChart(data) {
+            Highcharts.chart('chart-trends', {
+                chart: { type: 'line' },
+                title: { text: 'So sánh Điểm TB của Thể loại' },
+                xAxis: {
+                    categories: data.categories,
+                    title: { text: 'Năm (2010-2022)' }
+                },
+                yAxis: {
+                    min: 7, // Bắt đầu từ 7 điểm cho dễ so sánh
+                    title: { text: 'Điểm Trung Bình' }
+                },
+                series: data.series, // Đây là mảng 1-3 chuỗi (line)
+                tooltip: {
+                    shared: false // Ko hiển thị tooltip chung cho tất cả
+                }
+                // Tính năng "Bật/Tắt chuỗi" (Rubric 4) đã được bật tự động
+            });
+        }
+
+// === (THÊM MỚI) CÁC HÀM CHO TÍNH NĂNG 4 ===
+        async function loadF4Titles() {
+            /** Tải tất cả tên anime vào datalist */
+            try {
+                const res = await fetch(`${API_URL}/api/all_titles`);
+                const titles = await res.json();
+                const datalist = document.getElementById('anime-titles');
+                titles.forEach(title => {
+                    datalist.innerHTML += `<option value="${title}"></option>`;
+                });
+            } catch (e) {
+                console.error("Lỗi tải danh sách anime cho F4", e);
+            }
+        }
+
+        async function loadFeature4() {
+            /** Chạy khi nhấn nút 'Tìm gợi ý' */
+            const loadingDiv = document.getElementById('loading-f4');
+            const contentDiv = document.getElementById('f4-content');
+            // (THÊM MỚI)
+            const sourceContainer = document.getElementById('f4-source-container');
+            
+            loadingDiv.style.display = 'block';
+            contentDiv.style.display = 'none'; // Ẩn kết quả cũ
+            sourceContainer.style.display = 'none'; // (SỬA) Ẩn container anime gốc
+            
+            const title = document.getElementById('f4-anime-input').value;
+            
+            if (!title) {
+                alert('Vui lòng nhập hoặc chọn một tên anime từ danh sách.');
+                loadingDiv.style.display = 'none';
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_URL}/api/recommend?title=${encodeURIComponent(title)}`);
+                
+                if (!res.ok) {
+                    const err_data = await res.json();
+                    throw new Error(err_data.error || 'Lỗi không xác định từ server');
+                }
+                
+                const data = await res.json();
+                
+                // --- (SỬA) Bắt đầu thay đổi ---
+
+                // 1. Vẽ anime gốc LÊN TRÊN CÙNG
+                await drawSourceAnimeInfo(data.source_anime);
+                // (THÊM MỚI) Lấy năm của anime gốc
+                const sourceYear = data.source_anime.year;
+                // 2. Vẽ biểu đồ và grid
+                drawRecommendChart(data.chart_data);
+                drawAnimeGrid_F4_Kitsu(data.grid_data, 'grid-recommend', sourceYear);
+                
+                contentDiv.style.display = 'block'; // Hiển thị kết quả (chart + grid)
+                
+            } catch(e) {
+                console.error("Lỗi khi lấy gợi ý F4:", e);
+                document.getElementById('chart-recommend').innerHTML = `<p style='color: red; text-align: center;'>Lỗi: ${e.message}</p>`;
+                document.getElementById('grid-recommend').innerHTML = ''; 
+                // (SỬA) Vẫn hiển thị contentDiv để thấy lỗi
+                contentDiv.style.display = 'block'; 
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+// (THAY THẾ TOÀN BỘ HÀM NÀY)
+function drawRecommendChart(chartData) {
+    /** Vẽ biểu đồ tròn Top 5 gợi ý */
+    Highcharts.chart('chart-recommend', {
+        
+        // 1. Sửa loại biểu đồ
+        chart: {
+            type: 'pie' 
+        },
+        
+        title: {
+            text: 'Top 5 Anime Tương đồng nhất'
+        },
+
+        // 2. Sửa Tooltip (để hiển thị % và điểm)
+        tooltip: {
+            pointFormat: '<b>{point.name}</b>: {point.y:.4f} <b>({point.percentage:.1f}%)</b>'
+        },
+
+        // 3. Thêm PlotOptions (quan trọng cho biểu đồ tròn)
+        plotOptions: {
+            pie: {
+                allowPointSelect: true,
+                cursor: 'pointer',
+                dataLabels: {
+                    enabled: true,
+                    // Hiển thị tên anime lên các "miếng bánh"
+                    format: '<b>{point.name}</b>', 
+                    distance: -50 // Đặt nhãn bên trong
+                },
+                showInLegend: false // Không cần hiển thị chú thích bên dưới
+            }
+        },
+
+        // 4. Sửa Series (định dạng cho pie chart)
+        series: [{
+            name: 'Độ tương đồng',
+            colorByPoint: true,
+            // Dữ liệu chartData của bạn đã ở đúng định dạng
+            // [{name: '...', y: 0.8}, {name: '...', y: 0.7}]
+            data: chartData
+        }]
+        
+        // 5. xAxis, yAxis, và legend cũ đã bị xóa
+    });
+}
+
+// (THÊM MỚI) Hàm vẽ thông tin anime gốc
+async function drawSourceAnimeInfo(anime) {
+    const container = document.getElementById('f4-source-container');
+    container.innerHTML = '<h3>Tìm kiếm cho:</h3>'; // Thêm tiêu đề
+    
+    // 1. Lấy ảnh từ Jikan (chỉ 1 ảnh nên không cần sleep)
+    let imageUrl = `https://via.placeholder.com/150x190/667?text=${encodeURIComponent(anime.title.substring(0, 15))}`;
+    try {
+        const res = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(anime.title)}&limit=1`);
+        const jikanData = await res.json();
+        if (jikanData.data && jikanData.data.length > 0 && jikanData.data[0].images.jpg.image_url) {
+            imageUrl = jikanData.data[0].images.jpg.image_url;
+        }
+    } catch (e) {
+        console.error("Lỗi tải ảnh anime gốc", e);
+    }
+    
+    // 2. Tạo HTML (giống ảnh bạn gửi)
+    // Chúng ta dùng flexbox để xếp ảnh và thông tin cạnh nhau
+    container.innerHTML += `
+        <div style="display: flex; gap: 20px; background: #f9f9f9; padding: 15px; border-radius: 5px;">
+            <div style="flex-shrink: 0;">
+                <img src="${imageUrl}" alt="${anime.title}" style="width: 130px; height: 190px; object-fit: cover; border-radius: 5px;">
+            </div>
+            <div style="color: #333;">
+                <h2 style="margin: 0 0 10px 0;">${anime.title}</h2>
+                <p style="margin: 5px 0; font-size: 1.1em;">
+                    ${anime.year} | ${anime.studios}
+                </p>
+                <p style="margin: 5px 0; font-size: 1.1em;">
+                    <b>Score: ${anime.score}</b>
+                </p>
+                <p style="margin: 10px 0; color: #555;">
+                    ${anime.genres}
+                </p>
+            </div>
+        </div>
+        <hr style="margin-top: 30px;">
+    `;
+    
+    // 3. Hiển thị
+    container.style.display = 'block';
+}
+
+// (THAY THẾ) HÀM VẼ GRID CHO F1 (Dùng Kitsu)
+async function drawAnimeGrid_F1_Kitsu(animeList, gridId) {
+    if (isKitsuLoading) { // <-- Sửa khóa
+        alert("Tính năng F1/F4 (Kitsu) đang tải, vui lòng đợi...");
+        return;
+    }
+    isKitsuLoading = true; // <-- Sửa khóa
+
+    const grid = document.getElementById(gridId);
+    grid.innerHTML = ''; 
+    if (animeList.length === 0) {
+        grid.innerHTML = 'Không tìm thấy anime nào.';
+        isKitsuLoading = false; // <-- Sửa khóa
+        return;
+    }
+
+    try {
+        const itemsToShow = animeList.slice(0, 10); 
+
+        for (const anime of itemsToShow) {
+            const card = document.createElement('div');
+            card.className = 'anime-card';
+            
+            // Tooltip ĐƠN GIẢN
+            card.innerHTML = `
+                <img src="" alt="Đang tải..." data-title="${anime.title}">
+                <p class="anime-title">${anime.title}</p>
+                <div class="info-tooltip">
+                    <b>${anime.title}</b>
+                    <p>${anime.year} | ${anime.studios}</p>
+                    <p>Score: ${anime.score}</p>
+                    <p style="color: #ddd;">${anime.genres}</p>
+                </div>
+            `;
+            
+            grid.appendChild(card);
+            const img = card.querySelector('img');
+            const placeholderImg = `https://via.placeholder.com/150x190/667?text=${encodeURIComponent(anime.title.substring(0, 15))}`;
+
+            // (SỬA) Logic tải ảnh Kitsu (sleep 300)
+            await sleep(300); 
+            
+            try {
+                const res = await fetch(`https://kitsu.io/api/edge/anime?filter[text]=${encodeURIComponent(anime.title)}&page[limit]=1`, {
+                    headers: { 'Accept': 'application/vnd.api+json' }
+                });
+                const kitsuData = await res.json();
+                
+                let imageUrl = null;
+                if (kitsuData.data && kitsuData.data.length > 0) {
+                    imageUrl = kitsuData.data[0].attributes.posterImage.small;
+                }
+
+                if (imageUrl) {
+                    img.src = imageUrl;
+                    img.alt = anime.title;
+                } else {
+                    img.src = placeholderImg;
+                    img.alt = 'Không tìm thấy ảnh';
+                }
+            } catch (e) {
+                img.src = placeholderImg;
+                img.alt = 'Lỗi tải ảnh';
+            }
+        } // Hết vòng lặp
+    } finally {
+        isKitsuLoading = false; // <-- Sửa khóa
+    }
+}
+
+// (THAY THẾ) HÀM VẼ GRID CHO F2 (Dùng Jikan)
+async function drawAnimeGrid_F2_Jikan(animeList, gridId) {
+    if (isJikanLoading) { // <-- Sửa khóa
+        alert("Tính năng 2 (Jikan) đang tải, vui lòng đợi!");
+        return;
+    }
+
+    const grid = document.getElementById(gridId);
+    grid.innerHTML = ''; 
+    if (animeList.length === 0) {
+        grid.innerHTML = 'Không tìm thấy anime nào.';
+        isJikanLoading = false; // <-- Sửa khóa
+        return;
+    }
+
+    isJikanLoading = true; // <-- Sửa khóa
+    
+    try {
+        const itemsToShow = animeList.slice(0, 50);
+
+        for (const anime of itemsToShow) {
+            const card = document.createElement('div');
+            card.className = 'anime-card';
+            
+            // Tooltip ĐƠN GIẢN
+            card.innerHTML = `
+                <img src="" alt="Đang tải..." data-title="${anime.title}">
+                <p class="anime-title">${anime.title}</p>
+                <div class="info-tooltip">
+                    <b>${anime.title}</b>
+                    <p>${anime.year} | ${anime.studios}</p>
+                    <p>Score: ${anime.score}</p>
+                    <p style="color: #ddd;">${anime.genres}</p>
+                </div>
+            `;
+            
+            grid.appendChild(card);
+            
+            const img = card.querySelector('img');
+            const placeholderImg = `https://via.placeholder.com/150x190/667?text=${encodeURIComponent(anime.title.substring(0, 15))}`;
+
+            // (SỬA) Logic tải ảnh Jikan (sleep 1200)
+            await sleep(1200); 
+            
+            try {
+                const res = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(anime.title)}&limit=1`);
+                const jikanData = await res.json();
+                
+                let imageUrl = null;
+                if (jikanData.data && jikanData.data.length > 0) {
+                    imageUrl = jikanData.data[0].images.jpg.image_url;
+                }
+
+                if (imageUrl) {
+                    img.src = imageUrl;
+                    img.alt = anime.title;
+                } else {
+                    img.src = placeholderImg;
+                    img.alt = 'Không tìm thấy ảnh';
+                }
+            } catch (e) {
+                img.src = placeholderImg;
+                img.alt = 'Lỗi tải ảnh';
+            }
+        } // Hết vòng lặp
+    } finally {
+        isJikanLoading = false; // <-- Sửa khóa
+    }
+}
+
+// (THAY THẾ) HÀM VẼ GRID CHO F4 (Dùng Kitsu)
+async function drawAnimeGrid_F4_Kitsu(animeList, gridId, sourceYear) {
+    if (isKitsuLoading) { // <-- Sửa khóa
+        alert("Tính năng F1/F4 (Kitsu) đang tải, vui lòng đợi!");
+        return;
+    }
+    
+    const grid = document.getElementById(gridId);
+    grid.innerHTML = ''; 
+    if (animeList.length === 0) {
+        grid.innerHTML = 'Không tìm thấy anime nào.';
+        isKitsuLoading = false; // <-- Sửa khóa
+        return;
+    }
+
+    isKitsuLoading = true; // <-- Sửa khóa
+    
+    try {
+        const itemsToShow = animeList.slice(0, 50);
+
+        for (const anime of itemsToShow) {
+            const card = document.createElement('div');
+            card.className = 'anime-card';
+            
+            // --- Xây dựng Tooltip (Logic này giữ nguyên) ---
+            const final_score = (anime.similarity_score || 0).toFixed(4);
+            const score_nlp = anime.score_nlp || 0;
+            const matching_keywords = anime.matching_keywords || [];
+            const matching_genres = anime.matching_genres || "";
+            const matching_studio = anime.matching_studio || "";
+            // (THÊM MỚI)
+            const score_year = anime.score_year || 0;
+            const year_diff = Math.abs(anime.year - sourceYear);
+
+            let nlp_reason = "";
+            if (score_nlp >= 0.7) nlp_reason = `<li>⭐ Cốt truyện/Bối cảnh rất tương đồng (Điểm: ${score_nlp})</li>`;
+            else if (score_nlp >= 0.4) nlp_reason = `<li>✔️ Chủ đề/Bối cảnh khá tương đồng (Điểm: ${score_nlp})</li>`;
+            else if (score_nlp >= 0.2) nlp_reason = `<li>✔️ Có một vài nét tương đồng (Điểm: ${score_nlp})</li>`;
+
+            let keywords_reason = "";
+            if (matching_keywords.length > 0) keywords_reason = `<li>🔑 Từ khóa chung: ${matching_keywords.join(', ')}</li>`;
+            let studio_reason = "";
+            if (matching_studio) studio_reason = `<li>✔️ Cùng sản xuất bởi ${matching_studio}</li>`;
+            let genre_reason = "";
+            if (matching_genres) genre_reason = `<li>✔️ Cùng thể loại: ${matching_genres}</li>`;
+            // 6. (THÊM MỚI) Tạo lý do cho Năm
+            let year_reason = "";
+            if (score_year >= 0.8 && year_diff <= 3) { // Rất gần (ví dụ: trong 3 năm)
+                year_reason = `<li>✔️ Ra mắt tương đối gần (cách ${year_diff} năm)</li>`;
+            } else if (score_year >= 0.5) { // Tương đối gần
+                year_reason = `<li>✔️ Ra mắt cách ${year_diff} năm</li>`;
+            }
+            card.innerHTML = `
+                <img src="" alt="Đang tải..." data-title="${anime.title}">
+                <p class="anime-title">${anime.title}</p>
+                <div class="info-tooltip">
+                    <b>${anime.title}</b>
+                    <p style="color: #FFD700; font-weight: bold; background: #222; padding: 2px 4px; border-radius: 3px; margin: 5px 0;">
+                        Điểm tương đồng: ${final_score}
+                    </p>
+                    <p style="margin-top: 5px; margin-bottom: 0;"><b>Lý do gợi ý:</b></p>
+                    <ul style="margin: 0; padding-left: 20px; font-size: 0.95em; list-style-type: none;">
+                        ${nlp_reason}${keywords_reason}${studio_reason}${genre_reason}${year_reason}
+                    </ul>
+                    <hr style="border-color: #555; margin: 5px 0;">
+                    <p style="font-size: 0.9em; color: #ccc; margin: 0;">${anime.year} | ${anime.studios}</p>
+                    <p style="font-size: 0.9em; color: #ccc; margin: 0;">Score gốc: ${anime.score}</p>
+                    <p style="font-size: 0.8em; color: #999; margin: 0;">Thể loại gốc: ${anime.genres}</p>
+                </div>
+            `;
+            // --- HẾT TOOLTIP ---
+            
+            grid.appendChild(card);
+            
+            const img = card.querySelector('img');
+            const placeholderImg = `https://via.placeholder.com/150x190/667?text=${encodeURIComponent(anime.title.substring(0, 15))}`;
+
+            // --- (SỬA) LOGIC TẢI ẢNH (Dùng Kitsu) ---
+            await sleep(300); // Kitsu nhanh, chỉ cần sleep 300ms
+            
+            try {
+                const res = await fetch(`https://kitsu.io/api/edge/anime?filter[text]=${encodeURIComponent(anime.title)}&page[limit]=1`, {
+                    headers: { 'Accept': 'application/vnd.api+json' }
+                });
+                const kitsuData = await res.json();
+                
+                let imageUrl = null;
+                if (kitsuData.data && kitsuData.data.length > 0) {
+                    imageUrl = kitsuData.data[0].attributes.posterImage.small;
+                }
+
+                if (imageUrl) {
+                    img.src = imageUrl;
+                    img.alt = anime.title;
+                } else {
+                    img.src = placeholderImg;
+                    img.alt = 'Không tìm thấy ảnh';
+                }
+            } catch (e) {
+                img.src = placeholderImg;
+                img.alt = 'Lỗi tải ảnh';
+            }
+            // --- HẾT SỬA ---
+
+        } // Hết vòng lặp
+    } finally {
+        // (SỬA) Mở khóa Kitsu
+        isKitsuLoading = false;
+    }
+}
+        </script>
+</body>
+</html>

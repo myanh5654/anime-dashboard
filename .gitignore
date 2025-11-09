@@ -1,0 +1,15 @@
+# 1. Môi trường ảo 
+venv/
+quybuu/
+*.env
+
+# 2. File biến môi trường (Bảo mật)
+.env
+
+# 3. Thư mục cache của Python
+# Python tự tạo ra các file này, chúng không cần thiết.
+__pycache__/
+
+# 4. File cache của HĐH hoặc IDE
+.vscode/
+.DS_Store
