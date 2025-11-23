@@ -106,7 +106,7 @@
 - **Jikan API** - Lấy ảnh anime (Feature 2)
 
 ### Dữ liệu
-- Dataset: `anime_dataset.csv` (chứa 12,000+ anime với đầy đủ metadata)
+- Dataset: `anime_dataset.csv` (chứa 2,000+ anime với đầy đủ metadata)
 
 ---
 
