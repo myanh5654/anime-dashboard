@@ -93,7 +93,7 @@
 ## 🛠️ Công nghệ sử dụng
 
 ### Backend
-- **Python 3.x**
+- **Python**
 - **Flask** - Web framework
 - **Pandas** - Xử lý và phân tích dữ liệu
 - **Scikit-learn** - Machine Learning (TF-IDF, Cosine Similarity)
